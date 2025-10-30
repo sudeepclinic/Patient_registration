@@ -381,6 +381,33 @@
     // Run initialization on page load
     document.addEventListener('DOMContentLoaded', initializePage);
 
+    // --- Client-Side Security Measures ---
+
+    // 1. Disable Right-Click (Context Menu)
+    document.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+    });
+
+    // 2. Disable Keyboard Shortcuts for Developer Tools
+    document.addEventListener('keydown', function(e) {
+        // F12 key
+        if (e.key === 'F12') {
+            e.preventDefault();
+        }
+        // Ctrl+Shift+I (Inspect Element)
+        if (e.ctrlKey && e.shiftKey && e.key === 'I') {
+            e.preventDefault();
+        }
+        // Ctrl+Shift+J (Console)
+        if (e.ctrlKey && e.shiftKey && e.key === 'J') {
+            e.preventDefault();
+        }
+        // Ctrl+U (View Source)
+        if (e.ctrlKey && e.key === 'u') {
+            e.preventDefault();
+        }
+    });
+
 </script>
 </body>
 </html>
