@@ -197,6 +197,7 @@
 
     // --- State Management ---
     let isRegistrationOpen; // Will be set on page load
+    let loggedInAdminPassword = null; // Temporarily stores password after successful admin login
 
     // --- Form Submission Logic (Using fetch) ---
     const form = document.getElementById('patient-form');
@@ -270,6 +271,7 @@
                         successView.classList.add('hidden');
                         adminDashboard.classList.remove('hidden');
                         adminLoginBtn.classList.add('hidden');
+                        loggedInAdminPassword = password; // Store password for this session
                 } else {
                     alert(translations[currentLanguage].invalidPassword);
                 }
@@ -290,17 +292,17 @@
 
         // Show admin login button again
         adminLoginBtn.classList.remove('hidden');
+        loggedInAdminPassword = null; // Clear stored password on logout
     });
 
     formToggle.addEventListener('change', () => {
         isRegistrationOpen = formToggle.checked;
         updateToggleUI();
 
-        // Always prompt for password for this sensitive action
-        const password = prompt(translations[currentLanguage].confirmAdminPassword);
-
-        if (!password) { // If user cancels
-            // If user cancels, revert the UI change
+        // Use the stored password. If it's not available (e.g., page refresh),
+        // this action will fail gracefully on the backend.
+        if (!loggedInAdminPassword) {
+            alert("Admin session expired. Please log out and log back in to change status.");
             isRegistrationOpen = !isRegistrationOpen;
             updateToggleUI();
             return;
@@ -308,7 +310,8 @@
 
         fetch(SCRIPT_URL, {
             method: 'POST',
-            body: JSON.stringify({ action: 'setRegistrationStatus', isOpen: isRegistrationOpen, password: password }),
+            // Use the password stored after a successful login
+            body: JSON.stringify({ action: 'setRegistrationStatus', isOpen: isRegistrationOpen, password: loggedInAdminPassword }),
             headers: { 'Content-Type': 'text/plain;charset=utf-8' }
         })
         .then(res => res.json())
