@@ -128,6 +128,9 @@
             patientIdLabel: "Patient ID:",
             tokenLabel: "Today's Token:",
             invalidPassword: "The password you entered is incorrect.",
+            confirmAdminPassword: "Confirm admin password to change status:",
+            errorUpdatingStatus: "Error updating status: ",
+            failedToCommunicate: "Failed to communicate with the server.",
             errorAlert: "An error occurred. Please try again.",
             registrationClosedTitle: "Registration Closed",
             registrationClosedMsg: "New patient registration is currently closed. Please check back later.",
@@ -148,6 +151,9 @@
             patientIdLabel: "रुग्ण आयडी:",
             tokenLabel: "आजचे टोकन:",
             invalidPassword: "तुम्ही टाकलेला पासवर्ड चुकीचा आहे.",
+            confirmAdminPassword: "स्थिती बदलण्यासाठी प्रशासक पासवर्डची पुष्टी करा:",
+            errorUpdatingStatus: "स्थिती अद्यतनित करताना त्रुटी: ",
+            failedToCommunicate: "सर्व्हरशी संवाद साधण्यात अयशस्वी.",
             errorAlert: "एक त्रुटी आली. कृपया पुन्हा प्रयत्न करा.",
             registrationClosedTitle: "नोंदणी बंद आहे",
             registrationClosedMsg: "नवीन रुग्ण नोंदणी सध्या बंद आहे. कृपया नंतर पुन्हा तपासा.",
@@ -250,6 +256,7 @@
                         successView.classList.add('hidden');
                         adminDashboard.classList.remove('hidden');
                         adminLoginBtn.classList.add('hidden');
+                        loggedInAdminPassword = password; // Store password for subsequent actions
                     } else {
                         alert(translations[currentLanguage].invalidPassword);
                     }
@@ -266,6 +273,7 @@
 
         // Show admin login button again
         adminLoginBtn.classList.remove('hidden');
+        loggedInAdminPassword = null; // Clear stored password on logout
     });
 
     formToggle.addEventListener('change', () => {
@@ -273,22 +281,35 @@
         updateToggleUI();
 
         // We need the password to authorize this change on the server
-        const password = prompt("Confirm admin password to change status:");
-        if (!password) {
+        let passwordToUse = loggedInAdminPassword;
+        if (!passwordToUse) {
+            passwordToUse = prompt(translations[currentLanguage].confirmAdminPassword);
+        }
+
+        if (!passwordToUse) { // If user cancels or no password available
             // If user cancels, revert the UI change
             isRegistrationOpen = !isRegistrationOpen;
             updateToggleUI();
             return;
         }
 
-        // Call the backend to save the new state globally
         google.script.run
-            .withFailureHandler(err => alert('Error updating status: ' + err.message))
-            .doPost({ // We still call doPost for this action
-                postData: {
-                    contents: JSON.stringify({ action: 'setRegistrationStatus', isOpen: isRegistrationOpen, password: password })
+            .withSuccessHandler(response => {
+                if (response.result !== 'success') {
+                    alert(translations[currentLanguage].errorUpdatingStatus + response.message);
+                    // Revert UI if server update failed
+                    isRegistrationOpen = !isRegistrationOpen;
+                    updateToggleUI();
                 }
-            });
+            })
+            .withFailureHandler(err => {
+                console.error('Error updating status:', err);
+                alert(translations[currentLanguage].failedToCommunicate);
+                // Revert UI if communication failed
+                isRegistrationOpen = !isRegistrationOpen;
+                updateToggleUI();
+            })
+            .updateRegistrationStatus(isRegistrationOpen, passwordToUse); // Call the new server function
     });
 
     function updateToggleUI() {
@@ -319,19 +340,21 @@
 
     // --- Initial Page Load ---
     function initializePage() {
+        console.log("initializePage started.");
         // Set default language
         changeLanguage('en');
 
         // Fetch the global registration status from the server
         google.script.run
             .withSuccessHandler(status => {
+                console.log("getRegistrationStatus success:", status);
                 isRegistrationOpen = status.isOpen;
                 updateToggleUI(); // Update toggle based on fetched state
                 updateFormVisibility(); // Show correct initial view
             })
             .withFailureHandler(err => {
-                console.error("Could not fetch registration status.", err);
-                // Fallback to showing the form if the server can't be reached
+                console.error("getRegistrationStatus failed:", err);
+                alert("Failed to load initial status. Please try again. Error: " + err.message); // More explicit error
                 isRegistrationOpen = true;
                 updateFormVisibility();
             })
@@ -339,6 +362,7 @@
     }
 
     // Run initialization on page load
+    console.log("Adding DOMContentLoaded listener.");
     document.addEventListener('DOMContentLoaded', initializePage);
 
 </script>
