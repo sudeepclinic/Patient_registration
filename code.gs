@@ -29,26 +29,38 @@ function doGet(e) {
  * - If action=submitPatient, it handles new patient registration.
  */
 function doPost(e) {
-  try {
-    const data = JSON.parse(e.postData.contents);
-    const action = data.action || 'submitPatient'; // Default to patient submission
+    try {
+        const data = JSON.parse(e.postData.contents);
+        const action = data.action;
 
-    if (action === 'submitPatient') {
-      // Patient submission action
-      const status = getRegistrationStatus();
-      if (!status.isOpen) {
-        return createJsonResponse({ result: 'error', message: 'Registration is currently closed.' });
-      }
-      // If registration is open, proceed to handle the submission
-      return handlePatientSubmission(data);
-    } else {
-      // Reject any other actions sent to doPost, as they should now use google.script.run directly
-      return createJsonResponse({ result: 'error', message: 'Invalid action for doPost. Use google.script.run for admin actions.' });
+        switch (action) {
+            case 'submitPatient':
+                const status = getRegistrationStatus();
+                if (!status.isOpen) {
+                    return createJsonResponse({ result: 'error', message: 'Registration is currently closed.' });
+                }
+                return handlePatientSubmission(data);
+
+            case 'validateAdmin':
+                if (data.password === ADMIN_PASSWORD) {
+                    return createJsonResponse({ result: 'success' });
+                } else {
+                    return createJsonResponse({ result: 'error', message: 'Invalid password.' });
+                }
+
+            case 'setRegistrationStatus':
+                if (data.password !== ADMIN_PASSWORD) {
+                    return createJsonResponse({ result: 'error', message: 'Authentication failed.' });
+                }
+                setRegistrationStatus(data.isOpen);
+                return createJsonResponse({ result: 'success', message: 'Status updated.' });
+
+            default:
+                return createJsonResponse({ result: 'error', message: 'Invalid action specified.' });
+        }
+    } catch (error) {
+        return createJsonResponse({ result: 'error', message: 'Invalid request data. ' + error.toString() });
     }
-
-  } catch (error) {
-    return createJsonResponse({ result: 'error', message: error.toString() });
-  }
 }
 
 // --- CORE LOGIC HELPERS ---
@@ -106,32 +118,6 @@ function getRegistrationStatus() {
 function setRegistrationStatus(isOpen) {
   const properties = PropertiesService.getScriptProperties();
   properties.setProperty('REGISTRATION_IS_OPEN', String(isOpen));
-}
-
-/**
- * Securely validates the admin password from the client.
- * This function is callable via google.script.run.
- * @param {string} password - The password submitted by the user.
- * @return {boolean} - True if the password is correct, false otherwise.
- */
-function validateAdminPassword(password) {
-  // The password is only ever checked against the value stored securely on the server.
-  return password === ADMIN_PASSWORD;
-}
-
-/**
- * Updates the registration status after validating the admin password.
- * This function is callable via google.script.run.
- * @param {boolean} isOpen - The new status to set.
- * @param {string} password - The admin password for authentication.
- * @return {object} - A JSON-like object indicating success or failure.
- */
-function updateRegistrationStatus(isOpen, password) {
-  if (password !== ADMIN_PASSWORD) {
-    return { result: 'error', message: 'Authentication failed.' };
-  }
-  setRegistrationStatus(isOpen);
-  return { result: 'success', message: 'Status updated.' };
 }
 
 /**

@@ -113,6 +113,10 @@
 
 
 <script>
+    // IMPORTANT: This must be the URL of your deployed Google Apps Script Web App.
+    // Since your frontend is hosted separately, this URL is required.
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz1qBOucidIqjuN8zd5ynwHkjsK_lHWu42GEb9lcJgpskYEtzwlggjfK7eJEftFTDeZDw/exec";
+
     // --- Language Translation Logic ---
     const translations = {
         en: {
@@ -205,32 +209,37 @@
         submitButton.innerText = translations[currentLanguage].submitting;
 
         const patientData = {
+            action: 'submitPatient',
             name: document.getElementById('name').value,
             phone: document.getElementById('phone').value,
             age: document.getElementById('age').value
         };
 
-        // Use google.script.run to call the server-side function
-        google.script.run
-        .withSuccessHandler(data => {
-            // This function runs if the server returns successfully
-            // The 'data' object is the return value from handlePatientSubmission
-            if (data.result === 'success') {
-                document.getElementById('patient-id').innerText = data.patientId;
-                document.getElementById('token-number').innerText = data.tokenNumber;
-                document.getElementById('registration-form').classList.add('hidden');
-                document.getElementById('success-message').classList.remove('hidden');
-            } else {
-                throw new Error(data.message || 'An unknown error occurred.');
-            }
+        fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify(patientData),
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' } // Required for Apps Script doPost
         })
-        .withFailureHandler(error => {
-            // This function runs if the server-side function throws an error
-            console.error('Error!', error);
-            alert(translations[currentLanguage].errorAlert);
-            submitButton.disabled = false;
-            submitButton.innerText = translations[currentLanguage].getToken;
-        }).handlePatientSubmission(patientData); // Call the Apps Script function
+        .then(response => response.json())
+        .then(data => {
+             if (data.result === 'success') {
+                 document.getElementById('patient-id').innerText = data.patientId;
+                 document.getElementById('token-number').innerText = data.tokenNumber;
+                 document.getElementById('registration-form').classList.add('hidden');
+                 document.getElementById('success-message').classList.remove('hidden');
+             } else {
+                 // Use the server's error message if available
+                 alert(data.message || translations[currentLanguage].errorAlert);
+                 submitButton.disabled = false;
+                 submitButton.innerText = translations[currentLanguage].getToken;
+             }
+        })
+        .catch(error => {
+             console.error('Error!', error);
+             alert(translations[currentLanguage].errorAlert);
+             submitButton.disabled = false;
+             submitButton.innerText = translations[currentLanguage].getToken;
+        });
     });
 
     // --- Admin Panel Logic ---
@@ -246,9 +255,14 @@
     adminLoginBtn.addEventListener('click', () => {
         const password = prompt("Enter admin password:");
         if (password) { // Only proceed if the user entered something
-            google.script.run
-                .withSuccessHandler(isValid => {
-                    if (isValid) {
+            fetch(SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'validateAdmin', password: password }),
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.result === 'success') {
                         // Password is correct, show the dashboard
                         registrationFormView.classList.add('hidden');
                         loadingView.classList.add('hidden');
@@ -256,11 +270,14 @@
                         successView.classList.add('hidden');
                         adminDashboard.classList.remove('hidden');
                         adminLoginBtn.classList.add('hidden');
-                        loggedInAdminPassword = password; // Store password for subsequent actions
-                    } else {
-                        alert(translations[currentLanguage].invalidPassword);
-                    }
-                }).validateAdminPassword(password); // Call the new server function
+                } else {
+                    alert(translations[currentLanguage].invalidPassword);
+                }
+            })
+            .catch(err => {
+                console.error('Admin login error:', err);
+                alert(translations[currentLanguage].failedToCommunicate);
+            });
         }
     });
 
@@ -273,43 +290,41 @@
 
         // Show admin login button again
         adminLoginBtn.classList.remove('hidden');
-        loggedInAdminPassword = null; // Clear stored password on logout
     });
 
     formToggle.addEventListener('change', () => {
         isRegistrationOpen = formToggle.checked;
         updateToggleUI();
 
-        // We need the password to authorize this change on the server
-        let passwordToUse = loggedInAdminPassword;
-        if (!passwordToUse) {
-            passwordToUse = prompt(translations[currentLanguage].confirmAdminPassword);
-        }
+        // Always prompt for password for this sensitive action
+        const password = prompt(translations[currentLanguage].confirmAdminPassword);
 
-        if (!passwordToUse) { // If user cancels or no password available
+        if (!password) { // If user cancels
             // If user cancels, revert the UI change
             isRegistrationOpen = !isRegistrationOpen;
             updateToggleUI();
             return;
         }
 
-        google.script.run
-            .withSuccessHandler(response => {
-                if (response.result !== 'success') {
-                    alert(translations[currentLanguage].errorUpdatingStatus + response.message);
-                    // Revert UI if server update failed
-                    isRegistrationOpen = !isRegistrationOpen;
-                    updateToggleUI();
-                }
-            })
-            .withFailureHandler(err => {
-                console.error('Error updating status:', err);
-                alert(translations[currentLanguage].failedToCommunicate);
-                // Revert UI if communication failed
+        fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'setRegistrationStatus', isOpen: isRegistrationOpen, password: password }),
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.result !== 'success') {
+                alert(translations[currentLanguage].errorUpdatingStatus + data.message);
                 isRegistrationOpen = !isRegistrationOpen;
                 updateToggleUI();
-            })
-            .updateRegistrationStatus(isRegistrationOpen, passwordToUse); // Call the new server function
+            }
+        })
+        .catch(err => {
+            console.error('Error updating status:', err);
+            alert(translations[currentLanguage].failedToCommunicate);
+                    isRegistrationOpen = !isRegistrationOpen;
+                    updateToggleUI();
+        });
     });
 
     function updateToggleUI() {
@@ -340,29 +355,27 @@
 
     // --- Initial Page Load ---
     function initializePage() {
-        console.log("initializePage started.");
         // Set default language
         changeLanguage('en');
 
         // Fetch the global registration status from the server
-        google.script.run
-            .withSuccessHandler(status => {
-                console.log("getRegistrationStatus success:", status);
-                isRegistrationOpen = status.isOpen;
-                updateToggleUI(); // Update toggle based on fetched state
-                updateFormVisibility(); // Show correct initial view
-            })
-            .withFailureHandler(err => {
-                console.error("getRegistrationStatus failed:", err);
-                alert("Failed to load initial status. Please try again. Error: " + err.message); // More explicit error
-                isRegistrationOpen = true;
+        fetch(`${SCRIPT_URL}?action=getStatus`)
+            .then(res => res.json())
+            .then(data => {
+                isRegistrationOpen = data.isOpen;
+                updateToggleUI();
                 updateFormVisibility();
             })
-            .getRegistrationStatus();
+            .catch(err => {
+                console.error("Could not fetch registration status.", err);
+                alert(translations[currentLanguage].failedToCommunicate);
+                // Fallback to showing the form if the server can't be reached
+                isRegistrationOpen = true;
+                updateFormVisibility();
+            });
     }
 
     // Run initialization on page load
-    console.log("Adding DOMContentLoaded listener.");
     document.addEventListener('DOMContentLoaded', initializePage);
 
 </script>
