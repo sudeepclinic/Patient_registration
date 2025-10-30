@@ -1,5 +1,5 @@
 // --- CONFIGURATION ---
-const ADMIN_PASSWORD = "sudeepclinic1"; // This must match the password in your HTML file
+const ADMIN_PASSWORD = "admin123"; // This must match the password in your HTML file
 
 // --- MAIN HANDLERS ---
 
@@ -151,29 +151,40 @@ function getPatientId(sheet, phone, name) {
  * This will log everything to help us debug the date comparison.
  */
 function getNextToken(sheet, todayString) {
+  Logger.log("--- Starting Token Calculation ---");
+  Logger.log("[DEBUG] Today's Date (as string from doPost): " + todayString);
+
   const timezone = "Asia/Kolkata";
   const format = "dd/MM/yyyy";
   const data = sheet.getDataRange().getValues();
   let tokenCount = 0;
 
-  // Start from row 2 (index 1) to skip header
   for (let i = 1; i < data.length; i++) {
     const dateFromSheetCell = data[i][6]; // Column G is the Date column
+    Logger.log(" ");
+    Logger.log("[DEBUG] Checking Row #" + (i + 1));
+    Logger.log("[DEBUG] Raw value from sheet cell G: " + dateFromSheetCell);
 
-    // Skip empty rows or rows where the date cell is empty
-    if (!dateFromSheetCell) {
-      continue;
-    }
+    if (dateFromSheetCell) {
+      try {
+        const sheetDateString = Utilities.formatDate(new Date(dateFromSheetCell), timezone, format);
+        Logger.log("[DEBUG] Formatted Sheet Date: " + sheetDateString);
+        Logger.log("[DEBUG] Comparing '" + sheetDateString + "' with '" + todayString + "'");
 
-    // The value from the sheet can be a Date object or a string.
-    // new Date() handles both cases more reliably than just formatting.
-    // We create a new Date object to standardize it before formatting.
-    const sheetDate = new Date(dateFromSheetCell);
-    const sheetDateString = Utilities.formatDate(sheetDate, timezone, format);
-
-    if (sheetDateString === todayString) {
-      tokenCount++;
+        if (sheetDateString === todayString) {
+          tokenCount++;
+          Logger.log("[DEBUG] MATCH FOUND! New Token Count: " + tokenCount);
+        } else {
+          Logger.log("[DEBUG] No match.");
+        }
+      } catch(e) {
+        Logger.log("[ERROR] Could not format date in row " + (i + 1) + ". Error: " + e.toString());
+      }
+    } else {
+      Logger.log("[DEBUG] Cell is empty. Skipping row.");
     }
   }
+  
+  Logger.log("--- Finished. Final Token Count: " + tokenCount + " ---");
   return tokenCount + 1;
 }
