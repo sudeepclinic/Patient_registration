@@ -81,9 +81,9 @@ function handlePatientSubmission(data) {
   const format = "dd/MM/yyyy";
   const today = Utilities.formatDate(new Date(), timezone, format);
   var tokenNumber = getNextToken(sheet, today);
-  var timestamp = new Date();
+  var timestamp = new Date(); // This is for column A, storing the full timestamp
 
-  sheet.appendRow([timestamp, patientId, name, phone, age, tokenNumber, today]);
+  sheet.appendRow([timestamp, patientId, name, phone, age, tokenNumber, new Date()]); // Store a Date object in column G
 
   return createJsonResponse({
     'result': 'success', 'patientId': patientId, 'tokenNumber': tokenNumber
