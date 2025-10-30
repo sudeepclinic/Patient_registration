@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clinic Registration</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen relative">
+
+    <div class="w-full max-w-sm">
+        <!-- Language Switcher -->
+        <div class="flex justify-center mb-4 bg-white p-1 rounded-lg shadow-sm">
+            <button id="lang-en" class="px-4 py-1 text-sm font-semibold text-white bg-blue-600 rounded-md focus:outline-none" onclick="changeLanguage('en')">English</button>
+            <button id="lang-mr" class="px-4 py-1 text-sm font-semibold text-gray-600 bg-transparent rounded-md focus:outline-none" onclick="changeLanguage('mr')">मराठी</button>
+        </div>
+
+        <!-- Loading View (Initially Visible) -->
+        <div id="loading-view" class="bg-white p-8 rounded-lg shadow-md w-full max-w-sm text-center">
+            <img src="logo.png" alt="Clinic Logo" class="h-24 mx-auto mb-6">
+            <p class="text-gray-600 animate-pulse">Loading...</p>
+        </div>
+
+        <!-- Registration Form View -->
+        <div id="registration-form" class="bg-white p-8 rounded-lg shadow-md hidden">
+            <!-- Logo -->
+            <div class="flex justify-center mb-6">
+                <img src="logo.png" alt="Clinic Logo" class="h-24">
+            </div>
+
+            <h2 data-lang-key="welcome" class="text-2xl font-bold text-center text-gray-800 mb-4">Welcome to the Clinic</h2>
+            <p data-lang-key="instruction" class="text-center text-gray-500 mb-6">Please fill this form to get your token.</p>
+            
+            <form id="patient-form">
+                <!-- Form fields -->
+                <div class="mb-4">
+                    <label for="name" data-lang-key="fullName" class="block text-gray-700 font-semibold mb-2">Full Name</label>
+                    <input type="text" id="name" name="name" class="w-full px-3 py-2 border rounded-lg" required>
+                </div>
+                <div class="mb-4">
+                    <label for="phone" data-lang-key="phone" class="block text-gray-700 font-semibold mb-2">Phone Number</label>
+                    <input 
+                        type="tel" 
+                        id="phone" 
+                        name="phone" 
+                        class="w-full px-3 py-2 border rounded-lg" 
+                        required 
+                        maxlength="10" 
+                        pattern="[0-9]{10}" 
+                        title="Please enter a 10-digit phone number"
+                        oninput="this.value = this.value.replace(/[^0-9]/g, '');"
+                        >
+                </div>
+                <div class="mb-6">
+                    <label for="age" data-lang-key="age" class="block text-gray-700 font-semibold mb-2">Age</label>
+                    <input type="number" id="age" name="age" class="w-full px-3 py-2 border rounded-lg" required>
+                </div>
+                <button type="submit" id="submit-button" data-lang-key="getToken" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-300">
+                    Get My Token
+                </button>
+
+                <!-- Google Maps Embed -->
+                <div class="mt-6">
+                    <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d192.9303264165266!2d74.88937430666716!3d21.35544985797923!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bdf33aa4b8e8cdb%3A0xccde7daee9b7efea!2sSudip%20Clinic!5e1!3m2!1sen!2sin!4v1760775847078!5m2!1sen!2sin"
+                            width="100%" height="250" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade" class="rounded-lg">
+                    </iframe>
+                </div>
+            </form>
+        </div>
+
+        <!-- Registration Closed View (Initially Hidden) -->
+        <div id="registration-closed" class="bg-white p-8 rounded-lg shadow-md w-full max-w-sm text-center hidden">
+             <img src="logo.png" alt="Clinic Logo" class="h-24 mx-auto mb-6">
+            <h2 data-lang-key="registrationClosedTitle" class="text-2xl font-bold text-red-600 mb-4">Registration Closed</h2>
+            <p data-lang-key="registrationClosedMsg" class="text-gray-600">New patient registration is currently closed. Please check back later.</p>
+        </div>
+        
+        <!-- Success Message View (Initially Hidden) -->
+        <div id="success-message" class="bg-white p-8 rounded-lg shadow-md w-full max-w-sm text-center hidden">
+            <h2 data-lang-key="successTitle" class="text-2xl font-bold text-green-600 mb-4">Registration Successful!</h2>
+            <p data-lang-key="successInstruction" class="text-gray-600 mb-6">Please show this screen at the reception.</p>
+            <div class="bg-gray-100 p-4 rounded-lg">
+                <p data-lang-key="patientIdLabel" class="text-gray-700">Patient ID:</p>
+                <p id="patient-id" class="text-xl font-bold text-gray-900 mb-4">---</p>
+                <p data-lang-key="tokenLabel" class="text-gray-700">Today's Token:</p>
+                <p id="token-number" class="text-3xl font-extrabold text-blue-600">---</p>
+            </div>
+        </div>
+
+        <!-- Admin Dashboard View (Initially Hidden) -->
+        <div id="admin-dashboard" class="bg-white p-8 rounded-lg shadow-md w-full max-w-sm text-center hidden">
+            <h2 data-lang-key="adminDashboardTitle" class="text-2xl font-bold text-gray-800 mb-6">Admin Dashboard</h2>
+            
+            <div class="flex items-center justify-between bg-gray-100 p-4 rounded-lg mb-6">
+                <span data-lang-key="formStatusLabel" class="font-semibold text-gray-700">Patient Registration</span>
+                <label for="form-toggle" class="flex items-center cursor-pointer">
+                    <div class="relative">
+                        <input type="checkbox" id="form-toggle" class="sr-only">
+                        <div class="block bg-gray-600 w-14 h-8 rounded-full"></div>
+                        <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition"></div>
+                    </div>
+                </label>
+            </div>
+
+            <button id="admin-logout-button" data-lang-key="logout" class="w-full bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition duration-300">
+                Logout
+            </button>
+        </div>
+    </div>
+
+    <!-- Admin Login Button -->
+    <button id="admin-login-btn" class="fixed bottom-4 right-4 bg-gray-700 text-white px-3 py-1 rounded-full text-xs shadow-lg hover:bg-gray-800 focus:outline-none">Admin</button>
+
+
+<script>
+    // URL of our deployed Google Apps Script
+    // This is needed because we are using fetch() again
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw8yw0Go1E9BddsdIw5HGwJ-dxdr3s44Ttgh-Dvt-LhkkTCfpAGO35djKqcfTQchStmuA/exec";
+
+    // --- Language Translation Logic ---
+    const translations = {
+        en: {
+            welcome: "Welcome to the Clinic",
+            instruction: "Please fill this form to get your token.",
+            fullName: "Full Name",
+            phone: "Phone Number",
+            age: "Age",
+            getToken: "Get My Token",
+            submitting: "Submitting...",
+            successTitle: "Registration Successful!",
+            successInstruction: "Please show this screen at the reception.",
+            patientIdLabel: "Patient ID:",
+            tokenLabel: "Today's Token:",
+            errorAlert: "An error occurred. Please try again.",
+            registrationClosedTitle: "Registration Closed",
+            registrationClosedMsg: "New patient registration is currently closed. Please check back later.",
+            adminDashboardTitle: "Admin Dashboard",
+            formStatusLabel: "Patient Registration",
+            logout: "Logout"
+        },
+        mr: {
+            welcome: "क्लिनिकमध्ये आपले स्वागत आहे",
+            instruction: "कृपया टोकन मिळवण्यासाठी हा फॉर्म भरा.",
+            fullName: "पूर्ण नाव",
+            phone: "फोन नंबर",
+            age: "वय",
+            getToken: "माझे टोकन मिळवा",
+            submitting: "सबमिट करत आहे...",
+            successTitle: "नोंदणी यशस्वी झाली!",
+            successInstruction: "कृपया ही स्क्रीन रिसेप्शनवर दाखवा.",
+            patientIdLabel: "रुग्ण आयडी:",
+            tokenLabel: "आजचे टोकन:",
+            errorAlert: "एक त्रुटी आली. कृपया पुन्हा प्रयत्न करा.",
+            registrationClosedTitle: "नोंदणी बंद आहे",
+            registrationClosedMsg: "नवीन रुग्ण नोंदणी सध्या बंद आहे. कृपया नंतर पुन्हा तपासा.",
+            adminDashboardTitle: "प्रशासक डॅशबोर्ड",
+            formStatusLabel: "रुग्ण नोंदणी",
+            logout: "लॉगआउट"
+        }
+    };
+
+    let currentLanguage = 'en';
+
+    function changeLanguage(lang) {
+        currentLanguage = lang;
+        document.querySelectorAll('[data-lang-key]').forEach(elem => {
+            const key = elem.getAttribute('data-lang-key');
+            // Check if the key exists to avoid errors on elements that might not have a translation for every state
+            if (translations[lang][key]) {
+                elem.innerText = translations[lang][key];
+            }
+        });
+
+        // Update button styles
+        const enButton = document.getElementById('lang-en');
+        const mrButton = document.getElementById('lang-mr');
+        if (lang === 'en') {
+            enButton.classList.add('bg-blue-600', 'text-white');
+            enButton.classList.remove('bg-transparent', 'text-gray-600');
+            mrButton.classList.add('bg-transparent', 'text-gray-600');
+            mrButton.classList.remove('bg-blue-600', 'text-white');
+        } else {
+            mrButton.classList.add('bg-blue-600', 'text-white');
+            mrButton.classList.remove('bg-transparent', 'text-gray-600');
+            enButton.classList.add('bg-transparent', 'text-gray-600');
+            enButton.classList.remove('bg-blue-600', 'text-white');
+        }
+    }
+
+    // --- State Management ---
+    let isRegistrationOpen; // Will be set on page load
+    const ADMIN_PASSWORD = "admin123"; // IMPORTANT: Change this in a real application
+
+    // --- Form Submission Logic (Using fetch) ---
+    const form = document.getElementById('patient-form');
+    const submitButton = document.getElementById('submit-button');
+
+    form.addEventListener('submit', e => {
+        e.preventDefault();
+        
+        submitButton.disabled = true;
+        submitButton.innerText = translations[currentLanguage].submitting;
+
+        const formData = {
+            action: 'submitPatient', // Specify the action for the backend
+            name: document.getElementById('name').value,
+            phone: document.getElementById('phone').value,
+            age: document.getElementById('age').value
+        };
+
+        fetch(SCRIPT_URL, {
+            method: 'POST', // POST is already correct
+            body: JSON.stringify(formData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.result === 'success') {
+                document.getElementById('patient-id').innerText = data.patientId;
+                document.getElementById('token-number').innerText = data.tokenNumber;
+                document.getElementById('registration-form').classList.add('hidden');
+                document.getElementById('success-message').classList.remove('hidden');
+            } else {
+                throw new Error(data.message || 'An unknown error occurred.');
+            }
+        })
+        .catch(error => {
+            console.error('Error!', error);
+            alert(translations[currentLanguage].errorAlert);
+            submitButton.disabled = false;
+            submitButton.innerText = translations[currentLanguage].getToken;
+        });
+    });
+
+    // --- Admin Panel Logic ---
+    const adminLoginBtn = document.getElementById('admin-login-btn');
+    const adminDashboard = document.getElementById('admin-dashboard');
+    const registrationFormView = document.getElementById('registration-form');
+    const registrationClosedView = document.getElementById('registration-closed');
+    const loadingView = document.getElementById('loading-view');
+    const successView = document.getElementById('success-message');
+    const formToggle = document.getElementById('form-toggle');
+    const adminLogoutButton = document.getElementById('admin-logout-button');
+
+    adminLoginBtn.addEventListener('click', () => {
+        const password = prompt("Enter admin password:");
+        if (password === ADMIN_PASSWORD) {
+            // Hide all other views and show dashboard
+            registrationFormView.classList.add('hidden');
+            loadingView.classList.add('hidden');
+            registrationClosedView.classList.add('hidden');
+            successView.classList.add('hidden');
+            adminDashboard.classList.remove('hidden');
+            adminLoginBtn.classList.add('hidden'); // Hide login button
+        } else if (password) { // if password was entered but is wrong
+            alert("Incorrect password.");
+        }
+    });
+
+    adminLogoutButton.addEventListener('click', () => {
+        // Hide dashboard
+        adminDashboard.classList.add('hidden');
+        
+        // Show the correct view (form or closed message)
+        updateFormVisibility();
+
+        // Show admin login button again
+        adminLoginBtn.classList.remove('hidden');
+    });
+
+    formToggle.addEventListener('change', () => {
+        isRegistrationOpen = formToggle.checked;
+        updateToggleUI();
+
+        // Call the backend to save the new state globally
+        fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'setRegistrationStatus',
+                isOpen: isRegistrationOpen,
+                password: ADMIN_PASSWORD
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.result !== 'success') {
+                alert('Error updating status: ' + data.message);
+                // Optionally revert the UI change if the backend fails
+            }
+        }).catch(err => {
+            alert('Failed to communicate with the server.');
+        });
+    });
+
+    function updateToggleUI() {
+        const dot = formToggle.nextElementSibling.nextElementSibling;
+        if (isRegistrationOpen) {
+            formToggle.checked = true;
+            dot.style.transform = 'translateX(100%)';
+            dot.previousElementSibling.classList.remove('bg-gray-600');
+            dot.previousElementSibling.classList.add('bg-blue-600');
+        } else {
+            formToggle.checked = false;
+            dot.style.transform = 'translateX(0)';
+            dot.previousElementSibling.classList.remove('bg-blue-600');
+            dot.previousElementSibling.classList.add('bg-gray-600');
+        }
+    }
+
+    function updateFormVisibility() {
+        loadingView.classList.add('hidden'); // Ensure loading view is hidden
+        if (isRegistrationOpen) {
+            registrationFormView.classList.remove('hidden');
+            registrationClosedView.classList.add('hidden');
+        } else {
+            registrationFormView.classList.add('hidden');
+            registrationClosedView.classList.remove('hidden');
+        }
+    }
+
+    // --- Initial Page Load ---
+    function initializePage() {
+        // Set default language
+        changeLanguage('en');
+
+        // Fetch the global registration status from the server
+        fetch(`${SCRIPT_URL}?action=getStatus`)
+            .then(res => res.json())
+            .then(data => {
+                isRegistrationOpen = data.isOpen;
+
+                // Now update the UI based on the fetched state
+                updateToggleUI();
+                updateFormVisibility();
+            })
+            .catch(err => {
+                console.error("Could not fetch registration status.", err);
+                // Fallback to showing the form if the server can't be reached
+                isRegistrationOpen = true;
+                updateFormVisibility();
+            });
+    }
+
+    // Run initialization on page load
+    document.addEventListener('DOMContentLoaded', initializePage);
+
+</script>
+</body>
+</html>
