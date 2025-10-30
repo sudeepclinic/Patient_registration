@@ -147,44 +147,33 @@ function getPatientId(sheet, phone, name) {
 }
 
 /**
- * DETECTIVE VERSION of the getNextToken function.
- * This will log everything to help us debug the date comparison.
+ * Calculates the next available token number for a given date.
+ * This version is more robust against different date formats in the sheet.
+ * @param {Sheet} sheet The sheet to check for tokens.
+ * @param {string} todayString The date string for today in "dd/MM/yyyy" format.
+ * @return {number} The next token number.
  */
 function getNextToken(sheet, todayString) {
-  Logger.log("--- Starting Token Calculation ---");
-  Logger.log("[DEBUG] Today's Date (as string from doPost): " + todayString);
-
   const timezone = "Asia/Kolkata";
   const format = "dd/MM/yyyy";
   const data = sheet.getDataRange().getValues();
   let tokenCount = 0;
 
+  // Start from row 2 (index 1) to skip header
   for (let i = 1; i < data.length; i++) {
-    const dateFromSheetCell = data[i][6]; // Column G is the Date column
-    Logger.log(" ");
-    Logger.log("[DEBUG] Checking Row #" + (i + 1));
-    Logger.log("[DEBUG] Raw value from sheet cell G: " + dateFromSheetCell);
+    const dateFromSheetCell = data[i][6]; // Column G is the date
 
-    if (dateFromSheetCell) {
-      try {
-        const sheetDateString = Utilities.formatDate(new Date(dateFromSheetCell), timezone, format);
-        Logger.log("[DEBUG] Formatted Sheet Date: " + sheetDateString);
-        Logger.log("[DEBUG] Comparing '" + sheetDateString + "' with '" + todayString + "'");
-
-        if (sheetDateString === todayString) {
-          tokenCount++;
-          Logger.log("[DEBUG] MATCH FOUND! New Token Count: " + tokenCount);
-        } else {
-          Logger.log("[DEBUG] No match.");
-        }
-      } catch(e) {
-        Logger.log("[ERROR] Could not format date in row " + (i + 1) + ". Error: " + e.toString());
+    // Only proceed if the cell in the date column is not empty
+    if (dateFromSheetCell && dateFromSheetCell instanceof Date) {
+      // Format the date from the sheet to the same "dd/MM/yyyy" format
+      const sheetDateString = Utilities.formatDate(dateFromSheetCell, timezone, format);
+      
+      // If the formatted date from the sheet matches today's date string, increment the count
+      if (sheetDateString === todayString) {
+        tokenCount++;
       }
-    } else {
-      Logger.log("[DEBUG] Cell is empty. Skipping row.");
     }
   }
   
-  Logger.log("--- Finished. Final Token Count: " + tokenCount + " ---");
   return tokenCount + 1;
 }
