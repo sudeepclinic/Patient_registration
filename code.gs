@@ -1,5 +1,5 @@
 // --- CONFIGURATION ---
-const ADMIN_PASSWORD = "admin123"; // This must match the password in your HTML file
+const ADMIN_PASSWORD = "sandeepclinic1"; // This must match the password in your HTML file
 
 // --- MAIN HANDLERS ---
 
