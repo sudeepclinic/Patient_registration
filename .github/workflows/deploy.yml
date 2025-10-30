@@ -1,0 +1,37 @@
+# .github/workflows/deploy.yml
+name: Deploy Frontend to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main # Or 'master', depending on your default branch name
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Replace SCRIPT_URL placeholder
+        run: |
+          # Use sed to replace the placeholder with the actual SCRIPT_URL from GitHub Secrets
+          # The -i option modifies the file in place.
+          # We escape special characters in the URL to prevent sed errors.
+          sed -i "s|%%VITE_SCRIPT_URL%%|${{ secrets.SCRIPT_URL }}|g" index.html
+        env:
+          # Make the secret available as an environment variable for the run step
+          SCRIPT_URL: ${{ secrets.SCRIPT_URL }}
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Upload the modified index.html (and any other static assets)
+          path: '.' # This assumes your index.html and other assets are in the root of your repo
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
