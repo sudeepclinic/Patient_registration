@@ -113,10 +113,6 @@
 
 
 <script>
-    // URL of our deployed Google Apps Script
-    // This is needed because we are using fetch() again
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyYQGeiYZ4y0DkzzeoN_K6iEFMFjP6DkQqmKZLiu30yHEas2685cpNdWPXhe3R7w4mi3A/exec";
-
     // --- Language Translation Logic ---
     const translations = {
         en: {
@@ -131,6 +127,7 @@
             successInstruction: "Please show this screen at the reception.",
             patientIdLabel: "Patient ID:",
             tokenLabel: "Today's Token:",
+            invalidPassword: "The password you entered is incorrect.",
             errorAlert: "An error occurred. Please try again.",
             registrationClosedTitle: "Registration Closed",
             registrationClosedMsg: "New patient registration is currently closed. Please check back later.",
@@ -150,6 +147,7 @@
             successInstruction: "कृपया ही स्क्रीन रिसेप्शनवर दाखवा.",
             patientIdLabel: "रुग्ण आयडी:",
             tokenLabel: "आजचे टोकन:",
+            invalidPassword: "तुम्ही टाकलेला पासवर्ड चुकीचा आहे.",
             errorAlert: "एक त्रुटी आली. कृपया पुन्हा प्रयत्न करा.",
             registrationClosedTitle: "नोंदणी बंद आहे",
             registrationClosedMsg: "नवीन रुग्ण नोंदणी सध्या बंद आहे. कृपया नंतर पुन्हा तपासा.",
@@ -189,7 +187,6 @@
 
     // --- State Management ---
     let isRegistrationOpen; // Will be set on page load
-    const ADMIN_PASSWORD = "sandeepclinic1"; // IMPORTANT: Change this in a real application
 
     // --- Form Submission Logic (Using fetch) ---
     const form = document.getElementById('patient-form');
@@ -201,19 +198,17 @@
         submitButton.disabled = true;
         submitButton.innerText = translations[currentLanguage].submitting;
 
-        const formData = {
-            action: 'submitPatient', // Specify the action for the backend
+        const patientData = {
             name: document.getElementById('name').value,
             phone: document.getElementById('phone').value,
             age: document.getElementById('age').value
         };
 
-        fetch(SCRIPT_URL, {
-            method: 'POST', // POST is already correct
-            body: JSON.stringify(formData)
-        })
-        .then(response => response.json())
-        .then(data => {
+        // Use google.script.run to call the server-side function
+        google.script.run
+        .withSuccessHandler(data => {
+            // This function runs if the server returns successfully
+            // The 'data' object is the return value from handlePatientSubmission
             if (data.result === 'success') {
                 document.getElementById('patient-id').innerText = data.patientId;
                 document.getElementById('token-number').innerText = data.tokenNumber;
@@ -223,12 +218,13 @@
                 throw new Error(data.message || 'An unknown error occurred.');
             }
         })
-        .catch(error => {
+        .withFailureHandler(error => {
+            // This function runs if the server-side function throws an error
             console.error('Error!', error);
             alert(translations[currentLanguage].errorAlert);
             submitButton.disabled = false;
             submitButton.innerText = translations[currentLanguage].getToken;
-        });
+        }).handlePatientSubmission(patientData); // Call the Apps Script function
     });
 
     // --- Admin Panel Logic ---
@@ -243,16 +239,21 @@
 
     adminLoginBtn.addEventListener('click', () => {
         const password = prompt("Enter admin password:");
-        if (password === ADMIN_PASSWORD) {
-            // Hide all other views and show dashboard
-            registrationFormView.classList.add('hidden');
-            loadingView.classList.add('hidden');
-            registrationClosedView.classList.add('hidden');
-            successView.classList.add('hidden');
-            adminDashboard.classList.remove('hidden');
-            adminLoginBtn.classList.add('hidden'); // Hide login button
-        } else if (password) { // if password was entered but is wrong
-            alert("Incorrect password.");
+        if (password) { // Only proceed if the user entered something
+            google.script.run
+                .withSuccessHandler(isValid => {
+                    if (isValid) {
+                        // Password is correct, show the dashboard
+                        registrationFormView.classList.add('hidden');
+                        loadingView.classList.add('hidden');
+                        registrationClosedView.classList.add('hidden');
+                        successView.classList.add('hidden');
+                        adminDashboard.classList.remove('hidden');
+                        adminLoginBtn.classList.add('hidden');
+                    } else {
+                        alert(translations[currentLanguage].invalidPassword);
+                    }
+                }).validateAdminPassword(password); // Call the new server function
         }
     });
 
@@ -271,24 +272,23 @@
         isRegistrationOpen = formToggle.checked;
         updateToggleUI();
 
+        // We need the password to authorize this change on the server
+        const password = prompt("Confirm admin password to change status:");
+        if (!password) {
+            // If user cancels, revert the UI change
+            isRegistrationOpen = !isRegistrationOpen;
+            updateToggleUI();
+            return;
+        }
+
         // Call the backend to save the new state globally
-        fetch(SCRIPT_URL, {
-            method: 'POST',
-            body: JSON.stringify({
-                action: 'setRegistrationStatus',
-                isOpen: isRegistrationOpen,
-                password: ADMIN_PASSWORD
-            })
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.result !== 'success') {
-                alert('Error updating status: ' + data.message);
-                // Optionally revert the UI change if the backend fails
-            }
-        }).catch(err => {
-            alert('Failed to communicate with the server.');
-        });
+        google.script.run
+            .withFailureHandler(err => alert('Error updating status: ' + err.message))
+            .doPost({ // We still call doPost for this action
+                postData: {
+                    contents: JSON.stringify({ action: 'setRegistrationStatus', isOpen: isRegistrationOpen, password: password })
+                }
+            });
     });
 
     function updateToggleUI() {
@@ -323,21 +323,19 @@
         changeLanguage('en');
 
         // Fetch the global registration status from the server
-        fetch(`${SCRIPT_URL}?action=getStatus`)
-            .then(res => res.json())
-            .then(data => {
-                isRegistrationOpen = data.isOpen;
-
-                // Now update the UI based on the fetched state
-                updateToggleUI();
-                updateFormVisibility();
+        google.script.run
+            .withSuccessHandler(status => {
+                isRegistrationOpen = status.isOpen;
+                updateToggleUI(); // Update toggle based on fetched state
+                updateFormVisibility(); // Show correct initial view
             })
-            .catch(err => {
+            .withFailureHandler(err => {
                 console.error("Could not fetch registration status.", err);
                 // Fallback to showing the form if the server can't be reached
                 isRegistrationOpen = true;
                 updateFormVisibility();
-            });
+            })
+            .getRegistrationStatus();
     }
 
     // Run initialization on page load

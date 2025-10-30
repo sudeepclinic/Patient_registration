@@ -41,6 +41,11 @@ function doPost(e) {
       setRegistrationStatus(data.isOpen);
       return createJsonResponse({ result: 'success', message: 'Status updated.' });
 
+    } else if (action === 'adminLogin') {
+      // This action is now deprecated as we move to google.script.run
+      // but we keep it for reference or other potential uses.
+      // The new function validateAdminPassword will be used instead.
+      return createJsonResponse({ result: 'error', message: 'This login method is deprecated.' });
     } else if (action === 'submitPatient') {
       // Patient submission action
       const status = getRegistrationStatus();
@@ -112,6 +117,18 @@ function setRegistrationStatus(isOpen) {
   const properties = PropertiesService.getScriptProperties();
   properties.setProperty('REGISTRATION_IS_OPEN', String(isOpen));
 }
+
+/**
+ * Securely validates the admin password from the client.
+ * This function is callable via google.script.run.
+ * @param {string} password - The password submitted by the user.
+ * @return {boolean} - True if the password is correct, false otherwise.
+ */
+function validateAdminPassword(password) {
+  // The password is only ever checked against the value stored securely on the server.
+  return password === ADMIN_PASSWORD;
+}
+
 
 /**
  * Helper function to create a standardized JSON response.
